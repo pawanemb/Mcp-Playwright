@@ -251,18 +251,22 @@ class PlaywrightMCPServer {
     const page = this.pages.get(sessionId);
     if (!page) throw new Error('Session not found');
     
-    const screenshot = await page.screenshot({ 
-      fullPage,
-      type: 'png',
-      encoding: 'base64'
-    });
-    
-    return {
-      content: [
-        { type: 'text', text: 'Screenshot taken' },
-        { type: 'image', data: screenshot, mimeType: 'image/png' }
-      ]
-    };
+    try {
+      const screenshot = await page.screenshot({ 
+        fullPage,
+        type: 'png',
+        encoding: 'base64'
+      });
+      
+      return {
+        content: [
+          { type: 'text', text: 'Screenshot taken' },
+          { type: 'image', data: screenshot, mimeType: 'image/png' }
+        ]
+      };
+    } catch (error) {
+      throw new Error(`Screenshot failed: ${error.message}`);
+    }
   }
 
   async click({ sessionId, selector }) {
