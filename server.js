@@ -321,6 +321,25 @@ class RemoteMCPWrapper {
         
         const { jsonrpc, id, method, params } = req.body;
         
+        if (method === 'initialize') {
+          return res.json({
+            jsonrpc: '2.0',
+            id,
+            result: {
+              protocolVersion: '2025-03-26',
+              capabilities: {
+                tools: {
+                  listChanged: true
+                }
+              },
+              serverInfo: {
+                name: 'playwright-mcp-server',
+                version: '1.0.0'
+              }
+            }
+          });
+        }
+        
         if (method === 'tools/list') {
           return res.json({
             jsonrpc: '2.0',
@@ -475,6 +494,18 @@ class RemoteMCPWrapper {
     // Register MCP handler for all possible endpoints OpenAI might call
     this.app.post('/', handleMCP);           // Root endpoint
     this.app.post('/mcp', handleMCP);        // /mcp endpoint  
+    this.app.get('/mcp', (req, res) => {     // GET /mcp endpoint
+      res.json({
+        name: 'playwright-mcp-server',
+        version: '1.0.0',
+        description: 'Playwright browser automation MCP server',
+        capabilities: {
+          tools: {
+            listChanged: true
+          }
+        }
+      });
+    });
     this.app.post('/tools', handleMCP);      // /tools endpoint
     this.app.post('/tools/list', handleMCP); // Direct tools/list
     this.app.post('/tools/call', handleMCP); // Direct tools/call
