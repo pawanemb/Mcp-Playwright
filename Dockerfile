@@ -38,9 +38,9 @@ USER nodejs
 # Expose port
 EXPOSE 3000
 
-# Health check - Check if the main process is running
+# Health check - Check HTTP endpoint
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-  CMD pgrep -f "node simple-mcp-server.js" > /dev/null || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
 
 # Start the application
-CMD ["node", "simple-mcp-server.js"]
+CMD ["node", "http-mcp-server.js"]
