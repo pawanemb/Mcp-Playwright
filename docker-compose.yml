@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  mcp-playwright:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - MODE=remote
+      - HTTP_PORT=3000
+      - NODE_ENV=production
+    volumes:
+      - ./screenshots:/app/screenshots
+    restart: unless-stopped

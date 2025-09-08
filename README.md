@@ -1,80 +1,75 @@
-# Microsoft Playwright MCP Server
+# MCP Playwright Server
 
-Simple, lightweight Microsoft Playwright MCP (Model Context Protocol) server that can be connected from anywhere.
-
-## Quick Start
-
-1. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-
-2. **Install Playwright browsers:**
-   ```bash
-   npm run install-playwright
-   ```
-
-3. **Start the MCP server:**
-   ```bash
-   npm start
-   ```
-
-## Connection
-
-The MCP server will start and be available for connections. You can connect to it from:
-
-- **Claude Desktop** - Add to your MCP configuration
-- **Any MCP client** - Use the server endpoint
-- **OpenAI API calls** - Integrate with your applications
-
-## Configuration
-
-### For Claude Desktop
-
-Add to your `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "playwright": {
-      "command": "npx",
-      "args": ["@playwright/mcp@latest"],
-      "cwd": "/path/to/this/directory"
-    }
-  }
-}
-```
-
-### For other MCP clients
-
-The server runs on the default MCP protocol and can be connected to using standard MCP client libraries.
+A simple and clean Model Context Protocol (MCP) server that provides Playwright browser automation capabilities.
 
 ## Features
 
-- ✅ **Lightweight** - Minimal dependencies
-- ✅ **Accessibility-driven** - Built-in accessibility features
-- ✅ **Official** - Microsoft maintained
-- ✅ **Easy setup** - One command to start
-- ✅ **Fast** - Optimized for production use
+- **Browser Automation**: Launch and control Chromium, Firefox, or WebKit browsers
+- **Remote Access**: HTTP and WebSocket APIs for cross-platform access
+- **Session Management**: Multi-session support with unique session IDs
+- **Screenshot Capture**: Full page and viewport screenshots
+- **DOM Interaction**: Click, fill forms, extract text, and execute JavaScript
+- **Docker Ready**: Containerized deployment with Docker Compose
 
-## Commands
+## Quick Start
 
-- `npm start` - Start the MCP server
-- `npm run mcp` - Run MCP server directly
-- `npm run install-playwright` - Install Playwright browsers
+### Local Development
 
-## Requirements
+1. Install dependencies:
+```bash
+npm install
+npm run install-browsers
+```
 
-- Node.js 18 or higher
-- Internet connection for browser automation
+2. Run as MCP server:
+```bash
+npm start
+```
 
-## Troubleshooting
+3. Run as HTTP/WebSocket server:
+```bash
+MODE=remote npm start
+```
 
-If you encounter issues:
+### Docker Deployment
 
-1. Make sure Node.js 18+ is installed
-2. Run `npm run install-playwright` to install browsers
-3. Check that no other MCP server is running on the same port
+```bash
+docker-compose up -d
+```
+
+## Usage
+
+### Available Tools
+
+- `launch_browser` - Launch a new browser instance
+- `navigate` - Navigate to a URL
+- `screenshot` - Take page screenshots
+- `click` - Click DOM elements
+- `fill` - Fill form inputs
+- `get_text` - Extract text content
+- `evaluate` - Execute JavaScript
+- `close_browser` - Close browser session
+
+### Client Example
+
+```javascript
+import { PlaywrightMCPClient } from './client-example.js';
+
+const client = new PlaywrightMCPClient('http://localhost:3000');
+
+await client.launchBrowser('chromium');
+await client.navigate('https://example.com');
+const screenshot = await client.screenshot();
+await client.closeBrowser();
+```
+
+## Configuration
+
+Environment variables:
+- `MODE` - 'mcp' or 'remote' (default: 'mcp')
+- `HTTP_PORT` - HTTP server port (default: 3000)
+- `AUTH_TOKEN` - Authentication token
+- `NODE_ENV` - Environment mode
 
 ## License
 

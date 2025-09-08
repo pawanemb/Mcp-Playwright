@@ -1,46 +1,14 @@
-FROM node:18-alpine
+FROM mcr.microsoft.com/playwright:v1.40.0-focal
 
-# Install Playwright dependencies
-RUN apk add --no-cache \
-    chromium \
-    nss \
-    freetype \
-    freetype-dev \
-    harfbuzz \
-    ca-certificates \
-    ttf-freefont \
-    wget
-
-# Set Playwright to use system Chromium
-ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium-browser
-
-# Create app directory
 WORKDIR /app
 
-# Copy package files
 COPY package*.json ./
+RUN npm ci
 
-# Install dependencies
-RUN npm install --omit=dev
-
-# Install Playwright browsers
-RUN npx playwright install chromium
-
-# Copy app source
 COPY . .
 
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nodejs -u 1001
-USER nodejs
+RUN npx playwright install chromium firefox webkit
 
-# Expose port
 EXPOSE 3000
 
-# Health check - Check HTTP endpoint
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
-
-# Start the application
-CMD ["node", "simple-http-server.js"]
+CMD ["npm", "start"]
