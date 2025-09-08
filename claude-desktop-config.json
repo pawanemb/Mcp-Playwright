@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"],
+      "cwd": "/Users/pawan/Downloads/Live-Collaborative-AI-Editor-app-main"
+    }
+  }
+}

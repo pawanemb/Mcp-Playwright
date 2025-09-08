@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "my_mcp_server": {
+      "url": "https://your-domain.com",
+      "description": "My Remote Playwright MCP Server",
+      "headers": {
+        "Authorization": "Bearer your-secret-token-here"
+      }
+    }
+  }
+}

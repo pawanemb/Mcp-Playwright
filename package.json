@@ -1,0 +1,33 @@
+{
+  "name": "remote-playwright-mcp-server",
+  "version": "1.0.0",
+  "description": "Remote Microsoft Playwright MCP Server - Access from anywhere",
+  "main": "remote-mcp-server.js",
+  "scripts": {
+    "start": "node remote-mcp-server.js",
+    "dev": "node --watch remote-mcp-server.js",
+    "local": "node start-mcp.js",
+    "mcp": "npx @playwright/mcp@latest",
+    "install-playwright": "npx playwright install"
+  },
+  "keywords": [
+    "playwright",
+    "mcp",
+    "browser-automation",
+    "remote",
+    "api"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "playwright": "^1.41.0",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "ws": "^8.16.0",
+    "dotenv": "^16.4.5",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
