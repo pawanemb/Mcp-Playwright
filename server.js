@@ -308,6 +308,154 @@ class RemoteMCPWrapper {
       res.json({ status: 'healthy', service: 'mcp-playwright-server' });
     });
 
+    // MCP server manifest for OpenAI platform
+    this.app.get('/.well-known/mcp-server', (_, res) => {
+      res.json({
+        name: 'playwright-mcp-server',
+        version: '1.0.0',
+        description: 'Playwright browser automation MCP server',
+        author: 'Your Name',
+        license: 'MIT',
+        homepage: 'https://mcp.rayo.work',
+        repository: 'https://github.com/your-username/mcp-playwright',
+        capabilities: {
+          tools: true,
+          resources: false,
+          prompts: false
+        },
+        tools: [
+          {
+            name: 'launch_browser',
+            description: 'Launch a new browser instance',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                browserType: {
+                  type: 'string',
+                  enum: ['chromium', 'firefox', 'webkit'],
+                  description: 'Type of browser to launch'
+                },
+                headless: {
+                  type: 'boolean',
+                  description: 'Run browser in headless mode',
+                  default: true
+                },
+                sessionId: {
+                  type: 'string',
+                  description: 'Unique session identifier'
+                }
+              },
+              required: ['browserType', 'sessionId']
+            }
+          },
+          {
+            name: 'navigate',
+            description: 'Navigate to a URL',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                sessionId: { type: 'string', description: 'Session identifier' },
+                url: { type: 'string', description: 'URL to navigate to' }
+              },
+              required: ['sessionId', 'url']
+            }
+          },
+          {
+            name: 'screenshot',
+            description: 'Take a screenshot of the current page',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                sessionId: { type: 'string', description: 'Session identifier' },
+                fullPage: { type: 'boolean', description: 'Capture full page', default: false }
+              },
+              required: ['sessionId']
+            }
+          },
+          {
+            name: 'click',
+            description: 'Click an element on the page',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                sessionId: { type: 'string', description: 'Session identifier' },
+                selector: { type: 'string', description: 'CSS selector for the element' }
+              },
+              required: ['sessionId', 'selector']
+            }
+          },
+          {
+            name: 'fill',
+            description: 'Fill an input field',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                sessionId: { type: 'string', description: 'Session identifier' },
+                selector: { type: 'string', description: 'CSS selector for the input' },
+                value: { type: 'string', description: 'Value to fill' }
+              },
+              required: ['sessionId', 'selector', 'value']
+            }
+          },
+          {
+            name: 'get_text',
+            description: 'Get text content from an element',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                sessionId: { type: 'string', description: 'Session identifier' },
+                selector: { type: 'string', description: 'CSS selector for the element' }
+              },
+              required: ['sessionId', 'selector']
+            }
+          },
+          {
+            name: 'evaluate',
+            description: 'Execute JavaScript in the page context',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                sessionId: { type: 'string', description: 'Session identifier' },
+                script: { type: 'string', description: 'JavaScript code to execute' }
+              },
+              required: ['sessionId', 'script']
+            }
+          },
+          {
+            name: 'close_browser',
+            description: 'Close a browser session',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                sessionId: { type: 'string', description: 'Session identifier' }
+              },
+              required: ['sessionId']
+            }
+          }
+        ],
+        endpoints: {
+          tools: '/tools',
+          health: '/health'
+        }
+      });
+    });
+
+    // OpenAI-compatible tools list endpoint
+    this.app.get('/tools', (_, res) => {
+      res.json({
+        tools: [
+          { name: 'launch_browser', description: 'Launch a new browser instance' },
+          { name: 'navigate', description: 'Navigate to a URL' },
+          { name: 'screenshot', description: 'Take a screenshot of the current page' },
+          { name: 'click', description: 'Click an element on the page' },
+          { name: 'fill', description: 'Fill an input field' },
+          { name: 'get_text', description: 'Get text content from an element' },
+          { name: 'evaluate', description: 'Execute JavaScript in the page context' },
+          { name: 'close_browser', description: 'Close a browser session' }
+        ]
+      });
+    });
+
     this.app.post('/tool/:toolName', async (req, res) => {
       try {
         const { toolName } = req.params;
