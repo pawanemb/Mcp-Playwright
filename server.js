@@ -499,38 +499,54 @@ class RemoteMCPWrapper {
                 }
               ]
             }
-          });
+          };
+          console.log(`✅ TOOLS/LIST Response: ${response.result.tools.length} tools returned`);
+          return res.json(response);
         }
         
         if (method === 'tools/call') {
+          console.log(`🛠️ Handling TOOLS/CALL request`);
           const { name, arguments: args } = params;
+          console.log(`   Tool: ${name}, Args:`, JSON.stringify(args, null, 2));
+          
           const result = await this.executeToolCommand(name, args);
-          return res.json({
+          console.log(`✅ TOOLS/CALL Result:`, JSON.stringify(result, null, 2));
+          
+          const response = {
             jsonrpc: '2.0',
             id,
             result
-          });
+          };
+          return res.json(response);
         }
         
         // Unknown method
-        res.status(400).json({
+        console.log(`❌ Unknown MCP method: ${method}`);
+        const errorResponse = {
           jsonrpc: '2.0',
           id,
           error: {
             code: -32601,
             message: `Method not found: ${method}`
           }
-        });
+        };
+        console.log(`❌ Error Response:`, JSON.stringify(errorResponse, null, 2));
+        res.status(400).json(errorResponse);
         
       } catch (error) {
-        res.status(500).json({
+        console.log(`💥 MCP Handler Error:`, error);
+        console.log(`💥 Error Stack:`, error.stack);
+        
+        const errorResponse = {
           jsonrpc: '2.0',
           id: req.body?.id || null,
           error: {
             code: -32603,
             message: `Internal error: ${error.message}`
           }
-        });
+        };
+        console.log(`❌ Internal Error Response:`, JSON.stringify(errorResponse, null, 2));
+        res.status(500).json(errorResponse);
       }
     };
 
@@ -538,7 +554,8 @@ class RemoteMCPWrapper {
     this.app.post('/', handleMCP);           // Root endpoint
     this.app.post('/mcp', handleMCP);        // /mcp endpoint  
     this.app.get('/mcp', (req, res) => {     // GET /mcp endpoint
-      res.json({
+      console.log(`🔍 GET /mcp endpoint called`);
+      const response = {
         name: 'playwright-mcp-server',
         version: '1.0.0',
         description: 'Playwright browser automation MCP server',
@@ -547,7 +564,9 @@ class RemoteMCPWrapper {
             listChanged: true
           }
         }
-      });
+      };
+      console.log(`✅ GET /mcp Response:`, JSON.stringify(response, null, 2));
+      res.json(response);
     });
     this.app.post('/tools', handleMCP);      // /tools endpoint
     this.app.post('/tools/list', handleMCP); // Direct tools/list
@@ -555,7 +574,8 @@ class RemoteMCPWrapper {
     
     // Add GET handlers too in case OpenAI uses GET
     this.app.get('/tools/list', (req, res) => {
-      res.json({
+      console.log(`🔍 GET /tools/list endpoint called`);
+      const response = {
         tools: [
           { name: 'launch_browser', description: 'Launch a new browser instance' },
           { name: 'navigate', description: 'Navigate to a URL' },
@@ -566,21 +586,30 @@ class RemoteMCPWrapper {
           { name: 'evaluate', description: 'Execute JavaScript in the page context' },
           { name: 'close_browser', description: 'Close a browser session' }
         ]
-      });
+      };
+      console.log(`✅ GET /tools/list Response: ${response.tools.length} tools`);
+      res.json(response);
     });
 
     // Catch-all handler for any other MCP-related requests
     this.app.all('*', (req, res, next) => {
       if (!res.headersSent) {
-        console.log(`🔍 Unhandled ${req.method} ${req.path} - Query:`, req.query, 'Body:', req.body);
+        console.log(`\n🔍 CATCH-ALL HANDLER:`);
+        console.log(`   Method: ${req.method}`);
+        console.log(`   Path: ${req.path}`);
+        console.log(`   Query:`, req.query);
+        console.log(`   Body:`, req.body);
+        console.log(`   Headers:`, req.headers);
         
         // If it looks like an MCP request, handle it
         if (req.body && req.body.jsonrpc && req.body.method) {
+          console.log(`🔄 Redirecting to MCP handler`);
           return handleMCP(req, res);
         }
         
         // If it's asking for tools in any way, return tools
         if (req.path.includes('tool') || req.method === 'GET') {
+          console.log(`🛠️ Returning generic tools list`);
           return res.json({
             tools: [
               { name: 'launch_browser', description: 'Launch a new browser instance' },
@@ -594,6 +623,8 @@ class RemoteMCPWrapper {
             ]
           });
         }
+        
+        console.log(`❌ No handler found, passing to next middleware`);
       }
       next();
     });
@@ -603,10 +634,13 @@ class RemoteMCPWrapper {
       try {
         const { toolName } = req.params;
         const args = req.body;
+        console.log(`🔧 Legacy tool endpoint: ${toolName}`, JSON.stringify(args, null, 2));
         
         const result = await this.executeToolCommand(toolName, args);
+        console.log(`✅ Legacy tool result:`, JSON.stringify(result, null, 2));
         res.json(result);
       } catch (error) {
+        console.log(`❌ Legacy tool error:`, error.message);
         res.status(500).json({ error: error.message });
       }
     });
