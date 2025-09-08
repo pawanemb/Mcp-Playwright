@@ -303,6 +303,12 @@ class RemoteMCPWrapper {
   setupHTTPServer() {
     this.app.use(cors());
     this.app.use(express.json());
+    
+    // Log all requests to debug what OpenAI is calling
+    this.app.use((req, res, next) => {
+      console.log(`${new Date().toISOString()} - ${req.method} ${req.path} - Headers:`, JSON.stringify(req.headers, null, 2));
+      next();
+    });
 
     this.app.get('/health', (_, res) => {
       res.json({ status: 'healthy', service: 'mcp-playwright-server' });
@@ -440,8 +446,8 @@ class RemoteMCPWrapper {
       });
     });
 
-    // MCP protocol tools/list endpoint (what OpenAI calls)
-    this.app.post('/tools/list', (_, res) => {
+    // Add multiple endpoint variations that OpenAI might call
+    const toolsListHandler = (_, res) => {
       res.json({
         tools: [
           {
@@ -554,10 +560,18 @@ class RemoteMCPWrapper {
           }
         ]
       });
-    });
+    };
+
+    // Register the handler for multiple possible endpoints OpenAI might call
+    this.app.post('/tools/list', toolsListHandler);
+    this.app.get('/tools/list', toolsListHandler);
+    this.app.post('/tools', toolsListHandler);
+    this.app.get('/tools', toolsListHandler);
+    this.app.post('/mcp/tools/list', toolsListHandler);
+    this.app.get('/mcp/tools/list', toolsListHandler);
 
     // MCP protocol tools/call endpoint (what OpenAI calls for tool execution)
-    this.app.post('/tools/call', async (req, res) => {
+    const toolsCallHandler = async (req, res) => {
       try {
         const { name, arguments: args } = req.body;
         
@@ -571,6 +585,30 @@ class RemoteMCPWrapper {
           }
         });
       }
+    };
+
+    // Register call handler for multiple endpoints
+    this.app.post('/tools/call', toolsCallHandler);
+    this.app.post('/mcp/tools/call', toolsCallHandler);
+
+    // Add a catch-all route for debugging what OpenAI is calling
+    this.app.all('*', (req, res, next) => {
+      if (!res.headersSent) {
+        console.log(`Unhandled route: ${req.method} ${req.path}`);
+        console.log('Query params:', req.query);
+        console.log('Body:', req.body);
+        
+        // If it's a tools-related request, try to handle it
+        if (req.path.includes('tools') || req.path.includes('mcp')) {
+          if (req.path.includes('list') || req.method === 'GET') {
+            return toolsListHandler(req, res);
+          }
+          if (req.path.includes('call') || req.method === 'POST') {
+            return toolsCallHandler(req, res);
+          }
+        }
+      }
+      next();
     });
 
     this.app.post('/tool/:toolName', async (req, res) => {
