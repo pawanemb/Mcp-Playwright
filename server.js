@@ -381,6 +381,20 @@ class RemoteMCPWrapper {
           console.log(`✅ INITIALIZE Response:`, JSON.stringify(response, null, 2));
           return res.json(response);
         }
+
+        if (method === 'notifications/initialized') {
+          console.log(`📢 Handling NOTIFICATIONS/INITIALIZED request`);
+          // This is a notification, no response needed according to JSON-RPC 2.0 spec
+          console.log(`✅ INITIALIZED notification acknowledged`);
+          return res.status(204).send(); // No content response
+        }
+
+        // Handle any other notification methods
+        if (method && method.startsWith('notifications/')) {
+          console.log(`📢 Handling notification: ${method}`);
+          console.log(`✅ Notification acknowledged`);
+          return res.status(204).send(); // No content response for notifications
+        }
         
         if (method === 'tools/list') {
           console.log(`📋 Handling TOOLS/LIST request`);
