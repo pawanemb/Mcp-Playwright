@@ -478,6 +478,51 @@ class RemoteMCPWrapper {
     this.app.post('/tools', handleMCP);      // /tools endpoint
     this.app.post('/tools/list', handleMCP); // Direct tools/list
     this.app.post('/tools/call', handleMCP); // Direct tools/call
+    
+    // Add GET handlers too in case OpenAI uses GET
+    this.app.get('/tools/list', (req, res) => {
+      res.json({
+        tools: [
+          { name: 'launch_browser', description: 'Launch a new browser instance' },
+          { name: 'navigate', description: 'Navigate to a URL' },
+          { name: 'screenshot', description: 'Take a screenshot of the current page' },
+          { name: 'click', description: 'Click an element on the page' },
+          { name: 'fill', description: 'Fill an input field' },
+          { name: 'get_text', description: 'Get text content from an element' },
+          { name: 'evaluate', description: 'Execute JavaScript in the page context' },
+          { name: 'close_browser', description: 'Close a browser session' }
+        ]
+      });
+    });
+
+    // Catch-all handler for any other MCP-related requests
+    this.app.all('*', (req, res, next) => {
+      if (!res.headersSent) {
+        console.log(`🔍 Unhandled ${req.method} ${req.path} - Query:`, req.query, 'Body:', req.body);
+        
+        // If it looks like an MCP request, handle it
+        if (req.body && req.body.jsonrpc && req.body.method) {
+          return handleMCP(req, res);
+        }
+        
+        // If it's asking for tools in any way, return tools
+        if (req.path.includes('tool') || req.method === 'GET') {
+          return res.json({
+            tools: [
+              { name: 'launch_browser', description: 'Launch a new browser instance' },
+              { name: 'navigate', description: 'Navigate to a URL' },
+              { name: 'screenshot', description: 'Take a screenshot of the current page' },
+              { name: 'click', description: 'Click an element on the page' },
+              { name: 'fill', description: 'Fill an input field' },
+              { name: 'get_text', description: 'Get text content from an element' },
+              { name: 'evaluate', description: 'Execute JavaScript in the page context' },
+              { name: 'close_browser', description: 'Close a browser session' }
+            ]
+          });
+        }
+      }
+      next();
+    });
 
     // Legacy HTTP endpoints for direct testing
     this.app.post('/tool/:toolName', async (req, res) => {
