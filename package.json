@@ -10,12 +10,13 @@
     "install-browsers": "npx playwright install"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^0.5.0",
+    "@modelcontextprotocol/sdk": "^1.17.5",
     "playwright": "^1.40.0",
     "express": "^4.18.2",
     "ws": "^8.14.2",
     "dotenv": "^16.3.1",
-    "cors": "^2.8.5"
+    "cors": "^2.8.5",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

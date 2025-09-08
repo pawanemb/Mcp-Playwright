@@ -1,5 +1,9 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { 
+  ListToolsRequestSchema, 
+  CallToolRequestSchema 
+} from '@modelcontextprotocol/sdk/types.js';
 import { chromium, firefox, webkit } from 'playwright';
 import express from 'express';
 import { WebSocketServer } from 'ws';
@@ -29,7 +33,8 @@ class PlaywrightMCPServer {
   }
 
   setupTools() {
-    this.server.setRequestHandler('tools/list', async () => ({
+    // List tools handler
+    this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: [
         {
           name: 'launch_browser',
@@ -142,7 +147,8 @@ class PlaywrightMCPServer {
       ]
     }));
 
-    this.server.setRequestHandler('tools/call', async (request) => {
+    // Call tool handler
+    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
 
       try {
@@ -298,7 +304,7 @@ class RemoteMCPWrapper {
     this.app.use(cors());
     this.app.use(express.json());
 
-    this.app.get('/health', (req, res) => {
+    this.app.get('/health', (_, res) => {
       res.json({ status: 'healthy', service: 'mcp-playwright-server' });
     });
 
