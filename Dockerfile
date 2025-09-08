@@ -24,9 +24,6 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install --omit=dev
 
-# Install Playwright MCP package globally
-RUN npm install -g @playwright/mcp@latest
-
 # Install Playwright browsers
 RUN npx playwright install chromium
 

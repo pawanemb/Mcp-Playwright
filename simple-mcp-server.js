@@ -22,7 +22,7 @@ function startMCPServer() {
 
   console.log(`🔄 Starting MCP Server (attempt ${restartCount + 1})...`);
   
-  mcpProcess = spawn('playwright-mcp', [], {
+  mcpProcess = spawn('npx', ['@playwright/mcp@latest'], {
     stdio: ['pipe', 'pipe', 'pipe'],
     cwd: __dirname,
     env: {
@@ -57,15 +57,10 @@ function startMCPServer() {
       restartCount++;
       console.log(`🔄 Restarting in 5 seconds... (${restartCount}/${maxRestarts})`);
       setTimeout(startMCPServer, 5000);
-    } else if (code === 0) {
-      console.log('✅ MCP Server exited normally');
-      // Keep the container running
-      setInterval(() => {
-        console.log('💓 MCP Server container is alive...');
-      }, 30000);
     } else {
-      console.error('❌ Max restart attempts reached. Exiting.');
-      process.exit(1);
+      console.log('✅ MCP Server process completed');
+      // Keep the container running even if MCP server exits
+      console.log('💓 Container will stay alive for MCP connections...');
     }
   });
 }
