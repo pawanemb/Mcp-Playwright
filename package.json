@@ -5,9 +5,10 @@
   "type": "module",
   "main": "remote-mcp-server.js",
   "scripts": {
-    "start": "node remote-mcp-server.js",
-    "dev": "node --watch remote-mcp-server.js",
+    "start": "node simple-mcp-server.js",
+    "dev": "node --watch simple-mcp-server.js",
     "local": "node start-mcp.js",
+    "remote": "node remote-mcp-server.js",
     "mcp": "npx @playwright/mcp@latest",
     "install-playwright": "npx playwright install"
   },
@@ -26,7 +27,8 @@
     "cors": "^2.8.5",
     "ws": "^8.16.0",
     "dotenv": "^16.4.5",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "@modelcontextprotocol/sdk": "^0.5.0"
   },
   "engines": {
     "node": ">=18.0.0"
