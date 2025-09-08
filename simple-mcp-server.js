@@ -22,7 +22,7 @@ function startMCPServer() {
 
   console.log(`🔄 Starting MCP Server (attempt ${restartCount + 1})...`);
   
-  mcpProcess = spawn('npx', ['@playwright/mcp@latest'], {
+  mcpProcess = spawn('playwright-mcp', [], {
     stdio: ['pipe', 'pipe', 'pipe'],
     cwd: __dirname,
     env: {
