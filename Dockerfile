@@ -38,9 +38,9 @@ USER nodejs
 # Expose port
 EXPOSE 3000
 
-# Health check - MCP server runs on stdio, so we'll use a simple process check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD pgrep -f "node simple-mcp-server.js" || exit 1
+# Health check - Check if the main process is running
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+  CMD pgrep -f "node simple-mcp-server.js" > /dev/null || exit 1
 
 # Start the application
 CMD ["node", "simple-mcp-server.js"]
