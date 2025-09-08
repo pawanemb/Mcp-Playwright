@@ -238,8 +238,12 @@ class PlaywrightMCPServer {
   }
 
   async navigate({ sessionId, url }) {
-    const page = this.pages.get(sessionId);
-    if (!page) throw new Error('Session not found');
+    let page = this.pages.get(sessionId);
+    if (!page) {
+      // Auto-launch browser if session doesn't exist
+      await this.launchBrowser({ browserType: 'chromium', sessionId, headless: true });
+      page = this.pages.get(sessionId);
+    }
     
     await page.goto(url, { waitUntil: 'networkidle' });
     return {
@@ -248,8 +252,12 @@ class PlaywrightMCPServer {
   }
 
   async screenshot({ sessionId, fullPage = false }) {
-    const page = this.pages.get(sessionId);
-    if (!page) throw new Error('Session not found');
+    let page = this.pages.get(sessionId);
+    if (!page) {
+      // Auto-launch browser if session doesn't exist
+      await this.launchBrowser({ browserType: 'chromium', sessionId, headless: true });
+      page = this.pages.get(sessionId);
+    }
     
     try {
       const screenshot = await page.screenshot({ 
@@ -270,8 +278,12 @@ class PlaywrightMCPServer {
   }
 
   async click({ sessionId, selector }) {
-    const page = this.pages.get(sessionId);
-    if (!page) throw new Error('Session not found');
+    let page = this.pages.get(sessionId);
+    if (!page) {
+      // Auto-launch browser if session doesn't exist
+      await this.launchBrowser({ browserType: 'chromium', sessionId, headless: true });
+      page = this.pages.get(sessionId);
+    }
     
     await page.click(selector);
     return {
@@ -280,8 +292,12 @@ class PlaywrightMCPServer {
   }
 
   async fill({ sessionId, selector, value }) {
-    const page = this.pages.get(sessionId);
-    if (!page) throw new Error('Session not found');
+    let page = this.pages.get(sessionId);
+    if (!page) {
+      // Auto-launch browser if session doesn't exist
+      await this.launchBrowser({ browserType: 'chromium', sessionId, headless: true });
+      page = this.pages.get(sessionId);
+    }
     
     await page.fill(selector, value);
     return {
@@ -290,8 +306,12 @@ class PlaywrightMCPServer {
   }
 
   async getText({ sessionId, selector }) {
-    const page = this.pages.get(sessionId);
-    if (!page) throw new Error('Session not found');
+    let page = this.pages.get(sessionId);
+    if (!page) {
+      // Auto-launch browser if session doesn't exist
+      await this.launchBrowser({ browserType: 'chromium', sessionId, headless: true });
+      page = this.pages.get(sessionId);
+    }
     
     const text = await page.textContent(selector);
     return {
@@ -300,8 +320,12 @@ class PlaywrightMCPServer {
   }
 
   async evaluate({ sessionId, script }) {
-    const page = this.pages.get(sessionId);
-    if (!page) throw new Error('Session not found');
+    let page = this.pages.get(sessionId);
+    if (!page) {
+      // Auto-launch browser if session doesn't exist
+      await this.launchBrowser({ browserType: 'chromium', sessionId, headless: true });
+      page = this.pages.get(sessionId);
+    }
     
     const result = await page.evaluate(script);
     return {
@@ -310,8 +334,12 @@ class PlaywrightMCPServer {
   }
 
   async getHTML({ sessionId, selector }) {
-    const page = this.pages.get(sessionId);
-    if (!page) throw new Error('Session not found');
+    let page = this.pages.get(sessionId);
+    if (!page) {
+      // Auto-launch browser if session doesn't exist
+      await this.launchBrowser({ browserType: 'chromium', sessionId, headless: true });
+      page = this.pages.get(sessionId);
+    }
     
     let html;
     if (selector) {
@@ -330,8 +358,12 @@ class PlaywrightMCPServer {
   }
 
   async getMarkdown({ sessionId, selector }) {
-    const page = this.pages.get(sessionId);
-    if (!page) throw new Error('Session not found');
+    let page = this.pages.get(sessionId);
+    if (!page) {
+      // Auto-launch browser if session doesn't exist
+      await this.launchBrowser({ browserType: 'chromium', sessionId, headless: true });
+      page = this.pages.get(sessionId);
+    }
     
     let html;
     if (selector) {
