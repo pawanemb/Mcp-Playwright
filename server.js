@@ -440,20 +440,137 @@ class RemoteMCPWrapper {
       });
     });
 
-    // OpenAI-compatible tools list endpoint
-    this.app.get('/tools', (_, res) => {
+    // MCP protocol tools/list endpoint (what OpenAI calls)
+    this.app.post('/tools/list', (_, res) => {
       res.json({
         tools: [
-          { name: 'launch_browser', description: 'Launch a new browser instance' },
-          { name: 'navigate', description: 'Navigate to a URL' },
-          { name: 'screenshot', description: 'Take a screenshot of the current page' },
-          { name: 'click', description: 'Click an element on the page' },
-          { name: 'fill', description: 'Fill an input field' },
-          { name: 'get_text', description: 'Get text content from an element' },
-          { name: 'evaluate', description: 'Execute JavaScript in the page context' },
-          { name: 'close_browser', description: 'Close a browser session' }
+          {
+            name: 'launch_browser',
+            description: 'Launch a new browser instance',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                browserType: {
+                  type: 'string',
+                  enum: ['chromium', 'firefox', 'webkit'],
+                  description: 'Type of browser to launch'
+                },
+                headless: {
+                  type: 'boolean',
+                  description: 'Run browser in headless mode',
+                  default: true
+                },
+                sessionId: {
+                  type: 'string',
+                  description: 'Unique session identifier'
+                }
+              },
+              required: ['browserType', 'sessionId']
+            }
+          },
+          {
+            name: 'navigate',
+            description: 'Navigate to a URL',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                sessionId: { type: 'string', description: 'Session identifier' },
+                url: { type: 'string', description: 'URL to navigate to' }
+              },
+              required: ['sessionId', 'url']
+            }
+          },
+          {
+            name: 'screenshot',
+            description: 'Take a screenshot of the current page',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                sessionId: { type: 'string', description: 'Session identifier' },
+                fullPage: { type: 'boolean', description: 'Capture full page', default: false }
+              },
+              required: ['sessionId']
+            }
+          },
+          {
+            name: 'click',
+            description: 'Click an element on the page',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                sessionId: { type: 'string', description: 'Session identifier' },
+                selector: { type: 'string', description: 'CSS selector for the element' }
+              },
+              required: ['sessionId', 'selector']
+            }
+          },
+          {
+            name: 'fill',
+            description: 'Fill an input field',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                sessionId: { type: 'string', description: 'Session identifier' },
+                selector: { type: 'string', description: 'CSS selector for the input' },
+                value: { type: 'string', description: 'Value to fill' }
+              },
+              required: ['sessionId', 'selector', 'value']
+            }
+          },
+          {
+            name: 'get_text',
+            description: 'Get text content from an element',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                sessionId: { type: 'string', description: 'Session identifier' },
+                selector: { type: 'string', description: 'CSS selector for the element' }
+              },
+              required: ['sessionId', 'selector']
+            }
+          },
+          {
+            name: 'evaluate',
+            description: 'Execute JavaScript in the page context',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                sessionId: { type: 'string', description: 'Session identifier' },
+                script: { type: 'string', description: 'JavaScript code to execute' }
+              },
+              required: ['sessionId', 'script']
+            }
+          },
+          {
+            name: 'close_browser',
+            description: 'Close a browser session',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                sessionId: { type: 'string', description: 'Session identifier' }
+              },
+              required: ['sessionId']
+            }
+          }
         ]
       });
+    });
+
+    // MCP protocol tools/call endpoint (what OpenAI calls for tool execution)
+    this.app.post('/tools/call', async (req, res) => {
+      try {
+        const { name, arguments: args } = req.body;
+        
+        const result = await this.executeToolCommand(name, args);
+        res.json(result);
+      } catch (error) {
+        res.status(500).json({
+          error: {
+            message: error.message,
+            type: 'tool_execution_error'
+          }
+        });
+      }
     });
 
     this.app.post('/tool/:toolName', async (req, res) => {
