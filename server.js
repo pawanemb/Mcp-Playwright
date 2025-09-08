@@ -302,27 +302,67 @@ class RemoteMCPWrapper {
 
   setupHTTPServer() {
     this.app.use(cors());
-    this.app.use(express.json());
     
-    // Log all requests to debug what OpenAI is calling
+    // Enhanced request logging middleware
     this.app.use((req, res, next) => {
-      console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+      const timestamp = new Date().toISOString();
+      const userAgent = req.get('User-Agent') || 'Unknown';
+      const authHeader = req.get('Authorization') ? 'Present' : 'Missing';
+      
+      console.log(`\n🌐 [${timestamp}] INCOMING REQUEST:`);
+      console.log(`   Method: ${req.method}`);
+      console.log(`   Path: ${req.path}`);
+      console.log(`   Query: ${JSON.stringify(req.query)}`);
+      console.log(`   Headers: ${JSON.stringify(req.headers, null, 2)}`);
+      console.log(`   User-Agent: ${userAgent}`);
+      console.log(`   Auth: ${authHeader}`);
+      console.log(`   Content-Type: ${req.get('Content-Type') || 'None'}`);
+      
+      next();
+    });
+    
+    this.app.use(express.json({ 
+      limit: '10mb',
+      verify: (req, res, buf, encoding) => {
+        console.log(`📦 Raw body received (${buf.length} bytes)`);
+        if (buf.length > 0 && buf.length < 1000) {
+          console.log(`📦 Body preview: ${buf.toString('utf8')}`);
+        }
+      }
+    }));
+    
+    // Log parsed body
+    this.app.use((req, res, next) => {
+      if (req.body && Object.keys(req.body).length > 0) {
+        console.log(`📋 Parsed JSON body:`, JSON.stringify(req.body, null, 2));
+      }
       next();
     });
 
-    this.app.get('/health', (_, res) => {
-      res.json({ status: 'healthy', service: 'mcp-playwright-server' });
+    this.app.get('/health', (req, res) => {
+      console.log(`✅ Health check requested`);
+      res.json({ 
+        status: 'healthy', 
+        service: 'mcp-playwright-server',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime()
+      });
     });
 
     // MCP JSON-RPC 2.0 handler function
     const handleMCP = async (req, res) => {
       try {
-        console.log('MCP Request:', JSON.stringify(req.body, null, 2));
+        console.log(`\n🔧 MCP HANDLER CALLED:`);
+        console.log(`   Request path: ${req.path}`);
+        console.log(`   Request method: ${req.method}`);
+        console.log(`   Full MCP Request:`, JSON.stringify(req.body, null, 2));
         
         const { jsonrpc, id, method, params } = req.body;
+        console.log(`   Extracted - JSONRPC: ${jsonrpc}, ID: ${id}, Method: ${method}`);
         
         if (method === 'initialize') {
-          return res.json({
+          console.log(`🚀 Handling INITIALIZE request`);
+          const response = {
             jsonrpc: '2.0',
             id,
             result: {
@@ -337,11 +377,14 @@ class RemoteMCPWrapper {
                 version: '1.0.0'
               }
             }
-          });
+          };
+          console.log(`✅ INITIALIZE Response:`, JSON.stringify(response, null, 2));
+          return res.json(response);
         }
         
         if (method === 'tools/list') {
-          return res.json({
+          console.log(`📋 Handling TOOLS/LIST request`);
+          const response = {
             jsonrpc: '2.0',
             id,
             result: {
