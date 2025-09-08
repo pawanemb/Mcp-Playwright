@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { Server } from "@modelcontextprotocol/server";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { chromium } from "playwright";
 import express from 'express';
 import { createServer } from 'http';
