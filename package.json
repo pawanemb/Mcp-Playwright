@@ -2,6 +2,7 @@
   "name": "remote-playwright-mcp-server",
   "version": "1.0.0",
   "description": "Remote Microsoft Playwright MCP Server - Access from anywhere",
+  "type": "module",
   "main": "remote-mcp-server.js",
   "scripts": {
     "start": "node remote-mcp-server.js",
