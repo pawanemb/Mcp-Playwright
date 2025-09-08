@@ -345,7 +345,11 @@ class PlaywrightMCPServer {
     if (selector) {
       // Get HTML of specific element
       const element = await page.$(selector);
-      if (!element) throw new Error(`Element not found: ${selector}`);
+      if (!element) {
+        return {
+          content: [{ type: 'text', text: `Element not found: ${selector}. Available elements: ${await this.getAvailableSelectors(page)}` }]
+        };
+      }
       html = await element.innerHTML();
     } else {
       // Get entire page HTML
@@ -369,7 +373,11 @@ class PlaywrightMCPServer {
     if (selector) {
       // Get HTML of specific element
       const element = await page.$(selector);
-      if (!element) throw new Error(`Element not found: ${selector}`);
+      if (!element) {
+        return {
+          content: [{ type: 'text', text: `Element not found: ${selector}. Available elements: ${await this.getAvailableSelectors(page)}` }]
+        };
+      }
       html = await element.innerHTML();
     } else {
       // Get entire page HTML
@@ -382,6 +390,37 @@ class PlaywrightMCPServer {
     return {
       content: [{ type: 'text', text: markdown }]
     };
+  }
+
+  async getAvailableSelectors(page) {
+    try {
+      const selectors = await page.evaluate(() => {
+        const elements = document.querySelectorAll('*');
+        const tags = new Set();
+        const classes = new Set();
+        const ids = new Set();
+        
+        Array.from(elements).slice(0, 50).forEach(el => {
+          if (el.tagName) tags.add(el.tagName.toLowerCase());
+          if (el.className && typeof el.className === 'string') {
+            el.className.split(' ').forEach(cls => {
+              if (cls.trim()) classes.add('.' + cls.trim());
+            });
+          }
+          if (el.id) ids.add('#' + el.id);
+        });
+        
+        return {
+          tags: Array.from(tags).slice(0, 20),
+          classes: Array.from(classes).slice(0, 10),
+          ids: Array.from(ids).slice(0, 10)
+        };
+      });
+      
+      return `Tags: ${selectors.tags.join(', ')}. Classes: ${selectors.classes.join(', ')}. IDs: ${selectors.ids.join(', ')}`;
+    } catch (error) {
+      return 'Unable to get available selectors';
+    }
   }
 
   async closeBrowser({ sessionId }) {
