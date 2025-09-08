@@ -446,14 +446,163 @@ class RemoteMCPWrapper {
       });
     });
 
-    // Add multiple endpoint variations that OpenAI might call
-    const toolsListHandler = (_, res) => {
-      res.json({
-        tools: [
-          {
-            name: 'launch_browser',
-            description: 'Launch a new browser instance',
-            inputSchema: {
+    // MCP JSON-RPC 2.0 endpoint (the correct way)
+    this.app.post('/mcp', async (req, res) => {
+      try {
+        console.log('MCP Request:', JSON.stringify(req.body, null, 2));
+        
+        const { jsonrpc, id, method, params } = req.body;
+        
+        if (method === 'tools/list') {
+          return res.json({
+            jsonrpc: '2.0',
+            id,
+            result: {
+              tools: [
+                {
+                  name: 'launch_browser',
+                  description: 'Launch a new browser instance',
+                  inputSchema: {
+                    type: 'object',
+                    properties: {
+                      browserType: {
+                        type: 'string',
+                        enum: ['chromium', 'firefox', 'webkit'],
+                        description: 'Type of browser to launch'
+                      },
+                      headless: {
+                        type: 'boolean',
+                        description: 'Run browser in headless mode',
+                        default: true
+                      },
+                      sessionId: {
+                        type: 'string',
+                        description: 'Unique session identifier'
+                      }
+                    },
+                    required: ['browserType', 'sessionId']
+                  }
+                },
+                {
+                  name: 'navigate',
+                  description: 'Navigate to a URL',
+                  inputSchema: {
+                    type: 'object',
+                    properties: {
+                      sessionId: { type: 'string', description: 'Session identifier' },
+                      url: { type: 'string', description: 'URL to navigate to' }
+                    },
+                    required: ['sessionId', 'url']
+                  }
+                },
+                {
+                  name: 'screenshot',
+                  description: 'Take a screenshot of the current page',
+                  inputSchema: {
+                    type: 'object',
+                    properties: {
+                      sessionId: { type: 'string', description: 'Session identifier' },
+                      fullPage: { type: 'boolean', description: 'Capture full page', default: false }
+                    },
+                    required: ['sessionId']
+                  }
+                },
+                {
+                  name: 'click',
+                  description: 'Click an element on the page',
+                  inputSchema: {
+                    type: 'object',
+                    properties: {
+                      sessionId: { type: 'string', description: 'Session identifier' },
+                      selector: { type: 'string', description: 'CSS selector for the element' }
+                    },
+                    required: ['sessionId', 'selector']
+                  }
+                },
+                {
+                  name: 'fill',
+                  description: 'Fill an input field',
+                  inputSchema: {
+                    type: 'object',
+                    properties: {
+                      sessionId: { type: 'string', description: 'Session identifier' },
+                      selector: { type: 'string', description: 'CSS selector for the input' },
+                      value: { type: 'string', description: 'Value to fill' }
+                    },
+                    required: ['sessionId', 'selector', 'value']
+                  }
+                },
+                {
+                  name: 'get_text',
+                  description: 'Get text content from an element',
+                  inputSchema: {
+                    type: 'object',
+                    properties: {
+                      sessionId: { type: 'string', description: 'Session identifier' },
+                      selector: { type: 'string', description: 'CSS selector for the element' }
+                    },
+                    required: ['sessionId', 'selector']
+                  }
+                },
+                {
+                  name: 'evaluate',
+                  description: 'Execute JavaScript in the page context',
+                  inputSchema: {
+                    type: 'object',
+                    properties: {
+                      sessionId: { type: 'string', description: 'Session identifier' },
+                      script: { type: 'string', description: 'JavaScript code to execute' }
+                    },
+                    required: ['sessionId', 'script']
+                  }
+                },
+                {
+                  name: 'close_browser',
+                  description: 'Close a browser session',
+                  inputSchema: {
+                    type: 'object',
+                    properties: {
+                      sessionId: { type: 'string', description: 'Session identifier' }
+                    },
+                    required: ['sessionId']
+                  }
+                }
+              ]
+            }
+          });
+        }
+        
+        if (method === 'tools/call') {
+          const { name, arguments: args } = params;
+          const result = await this.executeToolCommand(name, args);
+          return res.json({
+            jsonrpc: '2.0',
+            id,
+            result
+          });
+        }
+        
+        // Unknown method
+        res.status(400).json({
+          jsonrpc: '2.0',
+          id,
+          error: {
+            code: -32601,
+            message: `Method not found: ${method}`
+          }
+        });
+        
+      } catch (error) {
+        res.status(500).json({
+          jsonrpc: '2.0',
+          id: req.body?.id || null,
+          error: {
+            code: -32603,
+            message: `Internal error: ${error.message}`
+          }
+        });
+      }
+    });
               type: 'object',
               properties: {
                 browserType: {
