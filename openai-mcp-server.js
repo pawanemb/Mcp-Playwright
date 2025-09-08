@@ -183,7 +183,7 @@ wss.on('connection', (ws, req) => {
   }));
 });
 
-// REST API endpoints for OpenAI platform
+// MCP Protocol endpoints for OpenAI platform
 app.get('/', (req, res) => {
   res.json({
     name: 'Playwright MCP Server for OpenAI Platform',
@@ -209,6 +209,171 @@ app.get('/', (req, res) => {
       'wait - Wait for elements',
       'evaluate - Run JavaScript',
       'download - Download files'
+    ]
+  });
+});
+
+// MCP Protocol: List tools endpoint
+app.get('/tools', authenticateToken, (req, res) => {
+  res.json({
+    tools: [
+      {
+        name: 'navigate',
+        description: 'Navigate to a URL',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            url: { 
+              type: 'string', 
+              description: 'URL to navigate to' 
+            }
+          },
+          required: ['url']
+        }
+      },
+      {
+        name: 'screenshot',
+        description: 'Take a screenshot of the current page',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            fullPage: { 
+              type: 'boolean', 
+              description: 'Take full page screenshot',
+              default: false
+            }
+          }
+        }
+      },
+      {
+        name: 'click',
+        description: 'Click an element',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            selector: { 
+              type: 'string', 
+              description: 'CSS selector of element to click' 
+            }
+          },
+          required: ['selector']
+        }
+      },
+      {
+        name: 'type',
+        description: 'Type text into an element',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            selector: { 
+              type: 'string', 
+              description: 'CSS selector of input element' 
+            },
+            text: { 
+              type: 'string', 
+              description: 'Text to type' 
+            }
+          },
+          required: ['selector', 'text']
+        }
+      },
+      {
+        name: 'getText',
+        description: 'Get text content from an element',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            selector: { 
+              type: 'string', 
+              description: 'CSS selector of element' 
+            }
+          },
+          required: ['selector']
+        }
+      },
+      {
+        name: 'fill',
+        description: 'Fill a form field',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            selector: { 
+              type: 'string', 
+              description: 'CSS selector of form field' 
+            },
+            value: { 
+              type: 'string', 
+              description: 'Value to fill' 
+            }
+          },
+          required: ['selector', 'value']
+        }
+      },
+      {
+        name: 'select',
+        description: 'Select an option from dropdown',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            selector: { 
+              type: 'string', 
+              description: 'CSS selector of select element' 
+            },
+            value: { 
+              type: 'string', 
+              description: 'Value to select' 
+            }
+          },
+          required: ['selector', 'value']
+        }
+      },
+      {
+        name: 'wait',
+        description: 'Wait for an element to appear',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            selector: { 
+              type: 'string', 
+              description: 'CSS selector to wait for' 
+            },
+            timeout: { 
+              type: 'number', 
+              description: 'Timeout in milliseconds',
+              default: 30000
+            }
+          },
+          required: ['selector']
+        }
+      },
+      {
+        name: 'evaluate',
+        description: 'Run JavaScript in the browser',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            script: { 
+              type: 'string', 
+              description: 'JavaScript code to execute' 
+            }
+          },
+          required: ['script']
+        }
+      },
+      {
+        name: 'download',
+        description: 'Download a file',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            url: { 
+              type: 'string', 
+              description: 'URL of file to download' 
+            }
+          },
+          required: ['url']
+        }
+      }
     ]
   });
 });
@@ -332,6 +497,50 @@ app.get('/api/health', (req, res) => {
     mcpRunning: mcpProcess !== null,
     platform: 'OpenAI Compatible'
   });
+});
+
+// MCP Protocol: Execute tool endpoint
+app.post('/tools/:toolName', authenticateToken, async (req, res) => {
+  const { toolName } = req.params;
+  const { arguments: toolArgs } = req.body;
+
+  try {
+    if (!mcpProcess || !mcpProcess.stdin.writable) {
+      return res.status(503).json({
+        error: 'MCP Server not available',
+        message: 'The underlying MCP server is not running'
+      });
+    }
+
+    // Create MCP request
+    const mcpRequest = {
+      jsonrpc: '2.0',
+      id: Date.now(),
+      method: 'tools/call',
+      params: {
+        name: toolName,
+        arguments: toolArgs || {}
+      }
+    };
+
+    // Send to MCP server
+    mcpProcess.stdin.write(JSON.stringify(mcpRequest) + '\n');
+
+    // For now, return a success response
+    // In a real implementation, you'd wait for the MCP response
+    res.json({
+      toolName,
+      status: 'executed',
+      message: `Tool ${toolName} has been sent to MCP server`,
+      arguments: toolArgs
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      error: 'Tool execution failed',
+      message: error.message
+    });
+  }
 });
 
 // Start server
