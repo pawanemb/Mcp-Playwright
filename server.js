@@ -314,8 +314,8 @@ class RemoteMCPWrapper {
       res.json({ status: 'healthy', service: 'mcp-playwright-server' });
     });
 
-    // Main MCP JSON-RPC 2.0 endpoint for OpenAI
-    this.app.post('/mcp', async (req, res) => {
+    // MCP JSON-RPC 2.0 handler function
+    const handleMCP = async (req, res) => {
       try {
         console.log('MCP Request:', JSON.stringify(req.body, null, 2));
         
@@ -470,7 +470,14 @@ class RemoteMCPWrapper {
           }
         });
       }
-    });
+    };
+
+    // Register MCP handler for all possible endpoints OpenAI might call
+    this.app.post('/', handleMCP);           // Root endpoint
+    this.app.post('/mcp', handleMCP);        // /mcp endpoint  
+    this.app.post('/tools', handleMCP);      // /tools endpoint
+    this.app.post('/tools/list', handleMCP); // Direct tools/list
+    this.app.post('/tools/call', handleMCP); // Direct tools/call
 
     // Legacy HTTP endpoints for direct testing
     this.app.post('/tool/:toolName', async (req, res) => {
