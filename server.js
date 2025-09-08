@@ -9,6 +9,7 @@ import express from 'express';
 import { WebSocketServer } from 'ws';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import TurndownService from 'turndown';
 
 dotenv.config();
 
@@ -17,6 +18,10 @@ class PlaywrightMCPServer {
     this.browsers = new Map();
     this.contexts = new Map();
     this.pages = new Map();
+    this.turndown = new TurndownService({
+      headingStyle: 'atx',
+      codeBlockStyle: 'fenced'
+    });
     this.server = new Server(
       {
         name: 'playwright-mcp-server',
@@ -134,6 +139,30 @@ class PlaywrightMCPServer {
           }
         },
         {
+          name: 'get_html',
+          description: 'Extract the HTML content of the current page',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              sessionId: { type: 'string', description: 'Session identifier' },
+              selector: { type: 'string', description: 'CSS selector to extract specific element (optional, defaults to entire page)' }
+            },
+            required: ['sessionId']
+          }
+        },
+        {
+          name: 'get_markdown',
+          description: 'Extract the HTML content and convert it to markdown',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              sessionId: { type: 'string', description: 'Session identifier' },
+              selector: { type: 'string', description: 'CSS selector to extract specific element (optional, defaults to entire page)' }
+            },
+            required: ['sessionId']
+          }
+        },
+        {
           name: 'close_browser',
           description: 'Close a browser session',
           inputSchema: {
@@ -167,6 +196,10 @@ class PlaywrightMCPServer {
             return await this.getText(args);
           case 'evaluate':
             return await this.evaluate(args);
+          case 'get_html':
+            return await this.getHTML(args);
+          case 'get_markdown':
+            return await this.getMarkdown(args);
           case 'close_browser':
             return await this.closeBrowser(args);
           default:
@@ -269,6 +302,49 @@ class PlaywrightMCPServer {
     const result = await page.evaluate(script);
     return {
       content: [{ type: 'text', text: JSON.stringify(result, null, 2) }]
+    };
+  }
+
+  async getHTML({ sessionId, selector }) {
+    const page = this.pages.get(sessionId);
+    if (!page) throw new Error('Session not found');
+    
+    let html;
+    if (selector) {
+      // Get HTML of specific element
+      const element = await page.$(selector);
+      if (!element) throw new Error(`Element not found: ${selector}`);
+      html = await element.innerHTML();
+    } else {
+      // Get entire page HTML
+      html = await page.content();
+    }
+    
+    return {
+      content: [{ type: 'text', text: html }]
+    };
+  }
+
+  async getMarkdown({ sessionId, selector }) {
+    const page = this.pages.get(sessionId);
+    if (!page) throw new Error('Session not found');
+    
+    let html;
+    if (selector) {
+      // Get HTML of specific element
+      const element = await page.$(selector);
+      if (!element) throw new Error(`Element not found: ${selector}`);
+      html = await element.innerHTML();
+    } else {
+      // Get entire page HTML
+      html = await page.content();
+    }
+    
+    // Convert HTML to Markdown
+    const markdown = this.turndown.turndown(html);
+    
+    return {
+      content: [{ type: 'text', text: markdown }]
     };
   }
 
@@ -501,6 +577,30 @@ class RemoteMCPWrapper {
                   }
                 },
                 {
+                  name: 'get_html',
+                  description: 'Extract the HTML content of the current page',
+                  inputSchema: {
+                    type: 'object',
+                    properties: {
+                      sessionId: { type: 'string', description: 'Session identifier' },
+                      selector: { type: 'string', description: 'CSS selector to extract specific element (optional, defaults to entire page)' }
+                    },
+                    required: ['sessionId']
+                  }
+                },
+                {
+                  name: 'get_markdown',
+                  description: 'Extract the HTML content and convert it to markdown',
+                  inputSchema: {
+                    type: 'object',
+                    properties: {
+                      sessionId: { type: 'string', description: 'Session identifier' },
+                      selector: { type: 'string', description: 'CSS selector to extract specific element (optional, defaults to entire page)' }
+                    },
+                    required: ['sessionId']
+                  }
+                },
+                {
                   name: 'close_browser',
                   description: 'Close a browser session',
                   inputSchema: {
@@ -598,6 +698,8 @@ class RemoteMCPWrapper {
           { name: 'fill', description: 'Fill an input field' },
           { name: 'get_text', description: 'Get text content from an element' },
           { name: 'evaluate', description: 'Execute JavaScript in the page context' },
+          { name: 'get_html', description: 'Extract HTML content of the current page' },
+          { name: 'get_markdown', description: 'Extract HTML content and convert it to markdown' },
           { name: 'close_browser', description: 'Close a browser session' }
         ]
       };
@@ -633,6 +735,8 @@ class RemoteMCPWrapper {
               { name: 'fill', description: 'Fill an input field' },
               { name: 'get_text', description: 'Get text content from an element' },
               { name: 'evaluate', description: 'Execute JavaScript in the page context' },
+              { name: 'get_html', description: 'Extract HTML content of the current page' },
+              { name: 'get_markdown', description: 'Extract HTML content and convert it to markdown' },
               { name: 'close_browser', description: 'Close a browser session' }
             ]
           });
@@ -697,6 +801,8 @@ class RemoteMCPWrapper {
       'fill': 'fill',
       'get_text': 'getText',
       'evaluate': 'evaluate',
+      'get_html': 'getHTML',
+      'get_markdown': 'getMarkdown',
       'close_browser': 'closeBrowser'
     };
 

@@ -16,7 +16,8 @@
     "ws": "^8.14.2",
     "dotenv": "^16.3.1",
     "cors": "^2.8.5",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "turndown": "^7.1.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
