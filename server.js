@@ -13,11 +13,213 @@ import TurndownService from 'turndown';
 
 dotenv.config();
 
+class SessionManager {
+  constructor() {
+    this.sessions = new Map(); // sessionId -> { browser, context, page, createdAt, lastUsed, config }
+    this.pendingLaunches = new Map(); // sessionId -> Promise
+    this.sessionTimeout = 30 * 60 * 1000; // 30 minutes
+    this.cleanupInterval = 5 * 60 * 1000; // 5 minutes
+    
+    // Start periodic cleanup
+    this.startCleanupTimer();
+  }
+
+  async getOrCreateSession(sessionId, config = {}) {
+    // Check if session creation is already in progress
+    if (this.pendingLaunches.has(sessionId)) {
+      console.log(`⏳ Session ${sessionId} creation in progress, waiting...`);
+      return await this.pendingLaunches.get(sessionId);
+    }
+
+    // Check if session already exists and is valid
+    if (this.sessions.has(sessionId)) {
+      const session = this.sessions.get(sessionId);
+      if (await this.validateSession(session)) {
+        session.lastUsed = Date.now();
+        console.log(`♻️ Reusing existing session: ${sessionId}`);
+        return session;
+      } else {
+        console.log(`🗑️ Session ${sessionId} invalid, cleaning up and recreating`);
+        await this.cleanupSession(sessionId);
+      }
+    }
+
+    // Create new session with locking
+    console.log(`🚀 Creating new session: ${sessionId}`);
+    const launchPromise = this.createSession(sessionId, config);
+    this.pendingLaunches.set(sessionId, launchPromise);
+
+    try {
+      const session = await launchPromise;
+      this.sessions.set(sessionId, session);
+      console.log(`✅ Session ${sessionId} created successfully`);
+      return session;
+    } catch (error) {
+      console.error(`❌ Failed to create session ${sessionId}:`, error.message);
+      throw error;
+    } finally {
+      this.pendingLaunches.delete(sessionId);
+    }
+  }
+
+  async createSession(sessionId, config) {
+    const { browserType = 'chromium', headless = true, ...otherConfig } = config;
+    
+    let browser, context, page;
+    
+    try {
+      // Launch browser
+      const browserClass = browserType === 'firefox' ? firefox : 
+                          browserType === 'webkit' ? webkit : chromium;
+      
+      browser = await browserClass.launch({ 
+        headless,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        ...otherConfig
+      });
+
+      // Create context
+      context = await browser.newContext();
+      
+      // Create page
+      page = await context.newPage();
+
+      const now = Date.now();
+      return {
+        sessionId,
+        browser,
+        context, 
+        page,
+        createdAt: now,
+        lastUsed: now,
+        config: { browserType, headless, ...otherConfig }
+      };
+    } catch (error) {
+      // Cleanup any partially created resources
+      try {
+        if (context) await context.close().catch(() => {});
+        if (browser) await browser.close().catch(() => {});
+      } catch (cleanupError) {
+        console.error(`Cleanup error for session ${sessionId}:`, cleanupError.message);
+      }
+      throw new Error(`Failed to create session ${sessionId}: ${error.message}`);
+    }
+  }
+
+  async validateSession(session) {
+    if (!session || !session.page || !session.browser) {
+      return false;
+    }
+
+    try {
+      // Check if browser is still connected
+      if (!session.browser.isConnected()) {
+        console.log(`🔌 Browser disconnected for session ${session.sessionId}`);
+        return false;
+      }
+
+      // Check if page is still accessible
+      await session.page.evaluate('1+1');
+      return true;
+    } catch (error) {
+      console.log(`💀 Session ${session.sessionId} validation failed:`, error.message);
+      return false;
+    }
+  }
+
+  async getSession(sessionId) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return null;
+    
+    if (await this.validateSession(session)) {
+      session.lastUsed = Date.now();
+      return session;
+    } else {
+      await this.cleanupSession(sessionId);
+      return null;
+    }
+  }
+
+  async cleanupSession(sessionId, force = false) {
+    const session = this.sessions.get(sessionId);
+    if (!session) return;
+
+    console.log(`🗑️ Cleaning up session: ${sessionId}`);
+    
+    try {
+      // Close page first
+      if (session.page && !session.page.isClosed()) {
+        await session.page.close().catch(e => console.log(`Page close error: ${e.message}`));
+      }
+      
+      // Close context
+      if (session.context) {
+        await session.context.close().catch(e => console.log(`Context close error: ${e.message}`));
+      }
+      
+      // Close browser
+      if (session.browser && session.browser.isConnected()) {
+        await session.browser.close().catch(e => console.log(`Browser close error: ${e.message}`));
+      }
+    } catch (error) {
+      console.error(`Error during cleanup of session ${sessionId}:`, error.message);
+    } finally {
+      // Always remove from sessions map
+      this.sessions.delete(sessionId);
+      console.log(`✅ Session ${sessionId} cleaned up`);
+    }
+  }
+
+  startCleanupTimer() {
+    setInterval(async () => {
+      await this.cleanupExpiredSessions();
+    }, this.cleanupInterval);
+  }
+
+  async cleanupExpiredSessions() {
+    const now = Date.now();
+    const expiredSessions = [];
+
+    for (const [sessionId, session] of this.sessions) {
+      if (now - session.lastUsed > this.sessionTimeout) {
+        expiredSessions.push(sessionId);
+      }
+    }
+
+    if (expiredSessions.length > 0) {
+      console.log(`🕐 Cleaning up ${expiredSessions.length} expired sessions`);
+      for (const sessionId of expiredSessions) {
+        await this.cleanupSession(sessionId);
+      }
+    }
+  }
+
+  async closeAllSessions() {
+    console.log(`🗑️ Closing all ${this.sessions.size} sessions`);
+    const cleanupPromises = Array.from(this.sessions.keys()).map(sessionId => 
+      this.cleanupSession(sessionId)
+    );
+    await Promise.allSettled(cleanupPromises);
+  }
+
+  getSessionStats() {
+    return {
+      totalSessions: this.sessions.size,
+      pendingLaunches: this.pendingLaunches.size,
+      sessions: Array.from(this.sessions.values()).map(s => ({
+        sessionId: s.sessionId,
+        browserType: s.config.browserType,
+        createdAt: new Date(s.createdAt).toISOString(),
+        lastUsed: new Date(s.lastUsed).toISOString(),
+        ageMinutes: Math.round((Date.now() - s.createdAt) / 60000)
+      }))
+    };
+  }
+}
+
 class PlaywrightMCPServer {
   constructor() {
-    this.browsers = new Map();
-    this.contexts = new Map();
-    this.pages = new Map();
+    this.sessionManager = new SessionManager();
     this.turndown = new TurndownService({
       headingStyle: 'atx',
       codeBlockStyle: 'fenced'
@@ -35,6 +237,16 @@ class PlaywrightMCPServer {
     );
     
     this.setupTools();
+    
+    // Cleanup sessions on exit
+    process.on('SIGTERM', () => this.cleanup());
+    process.on('SIGINT', () => this.cleanup());
+  }
+
+  async cleanup() {
+    console.log('🛑 Shutting down, cleaning up sessions...');
+    await this.sessionManager.closeAllSessions();
+    process.exit(0);
   }
 
   setupTools() {
@@ -213,24 +425,19 @@ class PlaywrightMCPServer {
     });
   }
 
-  async launchBrowser({ browserType, headless = true, sessionId }) {
+  async launchBrowser({ browserType = 'chromium', headless = true, sessionId, ...otherConfig }) {
     try {
-      const browserClass = browserType === 'firefox' ? firefox : 
-                          browserType === 'webkit' ? webkit : chromium;
-      
-      const browser = await browserClass.launch({ 
-        headless,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      const session = await this.sessionManager.getOrCreateSession(sessionId, { 
+        browserType, 
+        headless, 
+        ...otherConfig 
       });
-      const context = await browser.newContext();
-      const page = await context.newPage();
-      
-      this.browsers.set(sessionId, browser);
-      this.contexts.set(sessionId, context);
-      this.pages.set(sessionId, page);
       
       return {
-        content: [{ type: 'text', text: `Browser launched successfully with session ID: ${sessionId}` }]
+        content: [{ 
+          type: 'text', 
+          text: `Browser launched successfully with session ID: ${sessionId} (${session.config.browserType})` 
+        }]
       };
     } catch (error) {
       throw new Error(`Failed to launch browser: ${error.message}`);
@@ -238,29 +445,23 @@ class PlaywrightMCPServer {
   }
 
   async navigate({ sessionId, url }) {
-    let page = this.pages.get(sessionId);
-    if (!page) {
-      // Auto-launch browser if session doesn't exist
-      await this.launchBrowser({ browserType: 'chromium', sessionId, headless: true });
-      page = this.pages.get(sessionId);
-    }
+    const session = await this.sessionManager.getOrCreateSession(sessionId);
     
-    await page.goto(url, { waitUntil: 'networkidle' });
-    return {
-      content: [{ type: 'text', text: `Navigated to ${url}` }]
-    };
+    try {
+      await session.page.goto(url, { waitUntil: 'networkidle' });
+      return {
+        content: [{ type: 'text', text: `Navigated to ${url}` }]
+      };
+    } catch (error) {
+      throw new Error(`Navigation failed: ${error.message}`);
+    }
   }
 
   async screenshot({ sessionId, fullPage = false }) {
-    let page = this.pages.get(sessionId);
-    if (!page) {
-      // Auto-launch browser if session doesn't exist
-      await this.launchBrowser({ browserType: 'chromium', sessionId, headless: true });
-      page = this.pages.get(sessionId);
-    }
+    const session = await this.sessionManager.getOrCreateSession(sessionId);
     
     try {
-      const screenshot = await page.screenshot({ 
+      const screenshot = await session.page.screenshot({ 
         fullPage,
         type: 'png',
         encoding: 'base64'
@@ -278,118 +479,112 @@ class PlaywrightMCPServer {
   }
 
   async click({ sessionId, selector }) {
-    let page = this.pages.get(sessionId);
-    if (!page) {
-      // Auto-launch browser if session doesn't exist
-      await this.launchBrowser({ browserType: 'chromium', sessionId, headless: true });
-      page = this.pages.get(sessionId);
-    }
+    const session = await this.sessionManager.getOrCreateSession(sessionId);
     
-    await page.click(selector);
-    return {
-      content: [{ type: 'text', text: `Clicked element: ${selector}` }]
-    };
+    try {
+      await session.page.click(selector);
+      return {
+        content: [{ type: 'text', text: `Clicked element: ${selector}` }]
+      };
+    } catch (error) {
+      throw new Error(`Click failed: ${error.message}`);
+    }
   }
 
   async fill({ sessionId, selector, value }) {
-    let page = this.pages.get(sessionId);
-    if (!page) {
-      // Auto-launch browser if session doesn't exist
-      await this.launchBrowser({ browserType: 'chromium', sessionId, headless: true });
-      page = this.pages.get(sessionId);
-    }
+    const session = await this.sessionManager.getOrCreateSession(sessionId);
     
-    await page.fill(selector, value);
-    return {
-      content: [{ type: 'text', text: `Filled ${selector} with value` }]
-    };
+    try {
+      await session.page.fill(selector, value);
+      return {
+        content: [{ type: 'text', text: `Filled ${selector} with value` }]
+      };
+    } catch (error) {
+      throw new Error(`Fill failed: ${error.message}`);
+    }
   }
 
   async getText({ sessionId, selector }) {
-    let page = this.pages.get(sessionId);
-    if (!page) {
-      // Auto-launch browser if session doesn't exist
-      await this.launchBrowser({ browserType: 'chromium', sessionId, headless: true });
-      page = this.pages.get(sessionId);
-    }
+    const session = await this.sessionManager.getOrCreateSession(sessionId);
     
-    const text = await page.textContent(selector);
-    return {
-      content: [{ type: 'text', text: text || 'No text found' }]
-    };
+    try {
+      const text = await session.page.textContent(selector);
+      return {
+        content: [{ type: 'text', text: text || 'No text found' }]
+      };
+    } catch (error) {
+      throw new Error(`Get text failed: ${error.message}`);
+    }
   }
 
   async evaluate({ sessionId, script }) {
-    let page = this.pages.get(sessionId);
-    if (!page) {
-      // Auto-launch browser if session doesn't exist
-      await this.launchBrowser({ browserType: 'chromium', sessionId, headless: true });
-      page = this.pages.get(sessionId);
-    }
+    const session = await this.sessionManager.getOrCreateSession(sessionId);
     
-    const result = await page.evaluate(script);
-    return {
-      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }]
-    };
+    try {
+      const result = await session.page.evaluate(script);
+      return {
+        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }]
+      };
+    } catch (error) {
+      throw new Error(`Script evaluation failed: ${error.message}`);
+    }
   }
 
   async getHTML({ sessionId, selector }) {
-    let page = this.pages.get(sessionId);
-    if (!page) {
-      // Auto-launch browser if session doesn't exist
-      await this.launchBrowser({ browserType: 'chromium', sessionId, headless: true });
-      page = this.pages.get(sessionId);
-    }
+    const session = await this.sessionManager.getOrCreateSession(sessionId);
     
-    let html;
-    if (selector) {
-      // Get HTML of specific element
-      const element = await page.$(selector);
-      if (!element) {
-        return {
-          content: [{ type: 'text', text: `Element not found: ${selector}. Available elements: ${await this.getAvailableSelectors(page)}` }]
-        };
+    try {
+      let html;
+      if (selector) {
+        // Get HTML of specific element
+        const element = await session.page.$(selector);
+        if (!element) {
+          return {
+            content: [{ type: 'text', text: `Element not found: ${selector}. Available elements: ${await this.getAvailableSelectors(session.page)}` }]
+          };
+        }
+        html = await element.innerHTML();
+      } else {
+        // Get entire page HTML
+        html = await session.page.content();
       }
-      html = await element.innerHTML();
-    } else {
-      // Get entire page HTML
-      html = await page.content();
+      
+      return {
+        content: [{ type: 'text', text: html }]
+      };
+    } catch (error) {
+      throw new Error(`Get HTML failed: ${error.message}`);
     }
-    
-    return {
-      content: [{ type: 'text', text: html }]
-    };
   }
 
   async getMarkdown({ sessionId, selector }) {
-    let page = this.pages.get(sessionId);
-    if (!page) {
-      // Auto-launch browser if session doesn't exist
-      await this.launchBrowser({ browserType: 'chromium', sessionId, headless: true });
-      page = this.pages.get(sessionId);
-    }
+    const session = await this.sessionManager.getOrCreateSession(sessionId);
     
-    let html;
-    if (selector) {
-      // Get HTML of specific element
-      const element = await page.$(selector);
-      if (!element) {
-        return {
-          content: [{ type: 'text', text: `Element not found: ${selector}. Available elements: ${await this.getAvailableSelectors(page)}` }]
-        };
+    try {
+      let html;
+      if (selector) {
+        // Get HTML of specific element
+        const element = await session.page.$(selector);
+        if (!element) {
+          return {
+            content: [{ type: 'text', text: `Element not found: ${selector}. Available elements: ${await this.getAvailableSelectors(session.page)}` }]
+          };
+        }
+        html = await element.innerHTML();
+      } else {
+        // Get entire page HTML
+        html = await session.page.content();
       }
-      html = await element.innerHTML();
-    } else {
-      // Get entire page HTML
-      html = await page.content();
+      
+      // Convert HTML to Markdown
+      const markdown = this.turndown.turndown(html);
+      
+      return {
+        content: [{ type: 'text', text: markdown }]
+      };
+    } catch (error) {
+      throw new Error(`Get markdown failed: ${error.message}`);
     }
-    
-    // Convert HTML to Markdown
-    const markdown = this.turndown.turndown(html);
-    
-    return {
-      content: [{ type: 'text', text: markdown }]
-    };
   }
 
   async getAvailableSelectors(page) {
@@ -424,17 +619,16 @@ class PlaywrightMCPServer {
   }
 
   async closeBrowser({ sessionId }) {
-    const browser = this.browsers.get(sessionId);
-    if (browser) {
-      await browser.close();
-      this.browsers.delete(sessionId);
-      this.contexts.delete(sessionId);
-      this.pages.delete(sessionId);
+    try {
+      await this.sessionManager.cleanupSession(sessionId);
+      return {
+        content: [{ type: 'text', text: `Browser session ${sessionId} closed` }]
+      };
+    } catch (error) {
+      return {
+        content: [{ type: 'text', text: `Session ${sessionId} cleanup completed (may have been already closed)` }]
+      };
     }
-    
-    return {
-      content: [{ type: 'text', text: `Browser session ${sessionId} closed` }]
-    };
   }
 
   async run() {
@@ -492,12 +686,20 @@ class RemoteMCPWrapper {
 
     this.app.get('/health', (req, res) => {
       console.log(`✅ Health check requested`);
+      const sessionStats = this.mcpServer.sessionManager.getSessionStats();
       res.json({ 
         status: 'healthy', 
         service: 'mcp-playwright-server',
         timestamp: new Date().toISOString(),
-        uptime: process.uptime()
+        uptime: process.uptime(),
+        sessions: sessionStats
       });
+    });
+
+    this.app.get('/sessions', (req, res) => {
+      console.log(`📊 Session stats requested`);
+      const sessionStats = this.mcpServer.sessionManager.getSessionStats();
+      res.json(sessionStats);
     });
 
     // MCP JSON-RPC 2.0 handler function
